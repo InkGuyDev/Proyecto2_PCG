@@ -1,319 +1,186 @@
-using System;
 using System.Collections.Generic;
 using UnityEngine;
 
 public class EvolutionaryStrategy : MonoBehaviour
 {
     [Header("(mu + lambda) Evolution Strategy")]
-
-    /*
-     * mu = cantidad de padres que sobreviven.
-     *
-     * mu = 15
-     * parents.Count = 15
-     *
-     * parents = [
-     *   [25, 131, 94, 212, 135, 445],
-     *   [6, 150, 197, 376, 59, 248],
-     *   ...
-     *   [...] // padre 14
-     * ]
-     */
+    [Tooltip("mu = cantidad de padres que sobreviven en cada generación.")]
     [Min(1)]
     [SerializeField] private int mu = 15;
 
-    /*
-     * lambda = cantidad de hijos generados en cada generación.
-     *
-     * lambda = 45
-     * offspring.Count = 45
-     *
-     * Cada hijo se obtiene copiando un padre y aplicando mutación.
-     */
+    [Tooltip("lambda = cantidad de hijos generados por mutación en cada generación.")]
     [Min(1)]
     [SerializeField] private int lambda = 45;
 
     [Min(1)]
     [SerializeField] private int generations = 80;
 
-    /*
-     * mutationRate = probabilidad de mutar cada gen.
-     *
-     * mutationRate = 0.20
-     *
-     * Cada una de las 6 posiciones tiene 20% de probabilidad
-     * de ser reemplazada por otro Pokémon.
-     */
+    [Tooltip("Probabilidad de que cada mina (fuera de la máscara) cambie de posición al mutar.")]
     [Range(0f, 1f)]
     [SerializeField] private float mutationRate = 0.20f;
 
     [Header("Debug")]
     [SerializeField] private bool logProgress = true;
 
-    /*
-     * ============================================================
-     * (mu + lambda) EVOLUTION STRATEGY
-     * ============================================================
-     *
-     * DIFERENCIA PRINCIPAL CON GA
-     * ------------------------------------------------------------
-     * - NO utilizamos crossover.
-     * - Los hijos se crean desde un padre.
-     * - La principal fuente de variación es la mutación.
-     * - Padres e hijos compiten juntos.
-     *
-     * PSEUDOCÓDIGO GENERAL
-     * ------------------------------------------------------------
-     * 1: create mu random parents
-     * 2: evaluate parents
-     *
-     * 3: repeat for N generations:
-     * 4:      create empty offspring
-     *
-     * 5:      repeat lambda times:
-     * 6:          choose random parent
-     * 7:          child = copy(parent)
-     * 8:          mutate(child)
-     * 9:          evaluate(child)
-     * 10:         add child to offspring
-     *
-     * 11:     combined = parents + offspring
-     * 12:     sort combined by fitness
-     * 13:     keep best mu individuals as new parents
-     *
-     * 14: select generated content from final parents
-     *
-     * EJEMPLO
-     * ------------------------------------------------------------
-     * mu = 2
-     * lambda = 3
-     *
-     * parents:
-     * A -> fitness 0.80
-     * B -> fitness 0.72
-     *
-     * offspring:
-     * C -> fitness 0.88
-     * D -> fitness 0.65
-     * E -> fitness 0.91
-     *
-     * combined = [A, B, C, D, E]
-     *
-     * ordenado:
-     * E = 0.91
-     * C = 0.88
-     * A = 0.80
-     * B = 0.72
-     * D = 0.65
-     *
-     * Como mu = 2:
-     * newParents = [E, C]
-     */
-    /*public PokemonTeamCandidate Generate(
-        IReadOnlyList<PokemonData> dataset,
-        PokemonTeamGenerationConfig config)
+    /// <summary>
+    /// Ejecuta la Estrategia Evolutiva (mu + lambda) sobre el tablero inicial respetando la máscara.
+    /// </summary>
+    /// <param name="initialBoard">Tablero generado por RandomStartState</param>
+    /// <param name="maskGrid">Matriz de máscaras (true = casilla protegida)</param>
+    /// <param name="preferHighDensity">True = agrupar minas, False = separar minas</param>
+    /// <returns>El tablero con mejor fitness tras todas las generaciones</returns>
+    public List<List<char>> Generate(
+        List<List<char>> initialBoard,
+        bool[,] maskGrid,
+        bool preferHighDensity)
     {
-        if (dataset == null || dataset.Count == 0)
+        if (initialBoard == null || initialBoard.Count == 0)
             return null;
 
         System.Random random = new System.Random();
 
-        // TODO 1: Crear "mu" padres aleatorios.
-        // TODO 2: Evaluar padres.
-        // TODO 3: Repetir durante "generations".
-        //
-        // En cada generación:
-        // - crear lambda hijos
-        // - elegir un padre aleatorio para cada hijo
-        // - copiarlo
-        // - mutarlo
-        // - evaluarlo
-        //
-        // Después:
-        // combined = parents + offspring
-        // ordenar combined por fitness
-        // conservar solamente los mejores "mu"
+        // 1. Crear "mu" padres iniciales a partir del estado base
+        List<BoardCandidate> parents = CreateInitialParents(mu, initialBoard, maskGrid, random);
 
-        List<PokemonTeamCandidate> parents = CreateInitialParents(mu, dataset.Count, config, random);
+        // 2. Evaluar los padres iniciales
+        EvaluatePopulation(parents, maskGrid, preferHighDensity);
 
-        EvaluatePopulation(parents, dataset, config);
-
+        // 3. Ciclo evolutivo por "generations"
         for (int gen = 0; gen < generations; gen++)
         {
-            List<PokemonTeamCandidate> offspring = new List<PokemonTeamCandidate>();
+            List<BoardCandidate> offspring = new List<BoardCandidate>(lambda);
 
+            // Generar lambda hijos
             for (int i = 0; i < lambda; i++)
             {
-                PokemonTeamCandidate selectdParent = parents[random.Next(0, parents.Count)];
-                PokemonTeamCandidate child = selectdParent.Clone();
+                BoardCandidate selectedParent = parents[random.Next(0, parents.Count)];
+                BoardCandidate child = selectedParent.Clone();
 
-                Mutate(child, dataset.Count, random);
-                PokemonTeamFitness.Evaluate(child, dataset, config);
+                Mutate(child, maskGrid, random);
+                HillClimbing.EvaluateBoard(child, maskGrid, preferHighDensity);
 
                 offspring.Add(child);
             }
 
-            List<PokemonTeamCandidate> PokemonCombined = new List<PokemonTeamCandidate>();
-            PokemonCombined.AddRange(parents);
-            PokemonCombined.AddRange(offspring);
+            // Combinar padres + hijos (mu + lambda)
+            List<BoardCandidate> combined = new List<BoardCandidate>(mu + lambda);
+            combined.AddRange(parents);
+            combined.AddRange(offspring);
 
-            PokemonCombined.Sort((a, b) => b.fitness.CompareTo(a.fitness));
+            // Ordenar de mayor a menor fitness
+            combined.Sort((a, b) => b.fitness.CompareTo(a.fitness));
 
-            parents = PokemonCombined.GetRange(0, mu);
+            // Conservar únicamente los mejores "mu" individuos como nuevos padres
+            parents = combined.GetRange(0, mu);
 
             if (logProgress)
             {
-                Debug.Log($"[EvolutionaryStrategy] Gen {gen + 1}/{generations} - Best Fitness: {parents[0].fitness:F4}");
+                Debug.Log($"[EvolutionaryStrategy] Gen {gen + 1}/{generations} - Best Fitness: {parents[0].fitness:F2}");
             }
         }
 
-        //Debug.LogWarning(
-        //    "[EvolutionaryStrategy] TODO: implementar Generate()."
-        //);
-
-        return parents[0];
+        // Retornar el tablero del mejor individuo final
+        return parents[0].board;
     }
 
-    /*
-     * ============================================================
-     * CREAR PADRES INICIALES
-     * ============================================================
-     *
-     * mu = 15
-     * teamSize = 6
-     *
-     * parents.Count = 15
-     *
-     * Cada padre puede verse así:
-     * [25, 131, 94, 212, 135, 445]
-     *
-     * PSEUDOCÓDIGO
-     * ------------------------------------------------------------
-     * 1: create empty parents
-     * 2: repeat parentCount times:
-     * 3:      create candidate with teamSize genes
-     * 4:      assign random dataset index to every gene
-     * 5:      add candidate to parents
-     * 6: return parents
-     */
-    /*private List<PokemonTeamCandidate> CreateInitialParents(
+    /// <summary>
+    /// Crea los "mu" padres iniciales manteniendo las máscaras intactas y el mismo número de minas.
+    /// </summary>
+    private List<BoardCandidate> CreateInitialParents(
         int parentCount,
-        int datasetSize,
-        PokemonTeamGenerationConfig config,
+        List<List<char>> baseBoard,
+        bool[,] maskGrid,
         System.Random random)
     {
-        List<PokemonTeamCandidate> parents = new List<PokemonTeamCandidate>();
+        List<BoardCandidate> parents = new List<BoardCandidate>(parentCount);
 
-        for (int i = 0; i < parentCount; i++)
+        // El primer padre es exactamente el tablero inicial de RandomStartState
+        BoardCandidate firstParent = new BoardCandidate(baseBoard);
+        parents.Add(firstParent);
+
+        // Los demás padres son clones con variaciones iniciales para dar diversidad a la población
+        for (int i = 1; i < parentCount; i++)
         {
-            PokemonTeamCandidate candidate = new PokemonTeamCandidate(config.teamSize);
-
-            for (int j = 0; j < config.teamSize; j++)
-            {
-                candidate.genes[j] = random.Next(0, datasetSize);
-            }
-
+            BoardCandidate candidate = firstParent.Clone();
+            Mutate(candidate, maskGrid, random);
             parents.Add(candidate);
         }
 
         return parents;
-    }*/
+    }
 
-    /*
-     * ============================================================
-     * MUTACIÓN
-     * ============================================================
-     *
-     * Padre:
-     * [25, 131, 94, 212, 135, 445]
-     *
-     * Copia:
-     * [25, 131, 94, 212, 135, 445]
-     *
-     * Después de mutar:
-     * [25, 131, 700, 212, 135, 445]
-     *
-     * PSEUDOCÓDIGO
-     * ------------------------------------------------------------
-     * 1: mutated = false
-     * 2: for each gene:
-     * 3:      if random < mutationRate:
-     * 4:          replace gene with another random Pokemon
-     * 5:          mutated = true
-     *
-     * 6: if no gene was mutated:
-     * 7:      choose one random gene
-     * 8:      replace it with another Pokemon
-     *
-     * Queremos asegurar que cada hijo tenga al menos una variación.
-     */
-    /*private void Mutate(
-        PokemonTeamCandidate candidate,
-        int datasetSize,
+    /// <summary>
+    /// Muta un tablero moviendo minas ubicadas en zonas NO bloqueadas hacia casillas vacías NO bloqueadas.
+    /// </summary>
+    private void Mutate(
+        BoardCandidate candidate,
+        bool[,] maskGrid,
         System.Random random)
     {
-        bool mutated = false;
-        int index = 0;
+        List<Vector2Int> movableMines = new List<Vector2Int>();
+        List<Vector2Int> availableEmpty = new List<Vector2Int>();
 
-        foreach (int pokemon in candidate.genes)
+        for (int x = 0; x < candidate.width; x++)
         {
-            if (random.NextDouble() < mutationRate)
+            for (int y = 0; y < candidate.height; y++)
             {
-                candidate.genes[index] = RandomDifferentPokemon(pokemon, datasetSize, random);
+                // Si la casilla está protegida por la máscara, no se puede tocar
+                if (maskGrid != null && maskGrid[x, y])
+                    continue;
+
+                if (candidate.board[x][y] == 'M')
+                    movableMines.Add(new Vector2Int(x, y));
+                else if (candidate.board[x][y] == 'E')
+                    availableEmpty.Add(new Vector2Int(x, y));
+            }
+        }
+
+        if (movableMines.Count == 0 || availableEmpty.Count == 0)
+            return;
+
+        bool mutated = false;
+
+        // Recorremos las minas modificables y aplicamos mutationRate
+        for (int i = 0; i < movableMines.Count; i++)
+        {
+            if (random.NextDouble() < mutationRate && availableEmpty.Count > 0)
+            {
+                Vector2Int minePos = movableMines[i];
+                int randomEmptyIdx = random.Next(0, availableEmpty.Count);
+                Vector2Int newPos = availableEmpty[randomEmptyIdx];
+
+                // Mover la mina a la casilla vacía
+                candidate.board[minePos.x][minePos.y] = 'E';
+                candidate.board[newPos.x][newPos.y] = 'M';
+
+                // Actualizar la lista de vacías disponibles para no solapar minas en esta misma mutación
+                availableEmpty[randomEmptyIdx] = minePos;
                 mutated = true;
             }
-            index++;
         }
 
-        if (!mutated)
+        // Asegurar que cada hijo tenga al menos una variación respecto a su padre
+        if (!mutated && availableEmpty.Count > 0)
         {
-            int randomIndex = random.Next(0, candidate.genes.Length);
-            int currentPokemon = candidate.genes[randomIndex];
-            candidate.genes[randomIndex] = RandomDifferentPokemon(currentPokemon, datasetSize, random);
+            int randomMineIdx = random.Next(0, movableMines.Count);
+            int randomEmptyIdx = random.Next(0, availableEmpty.Count);
+
+            Vector2Int minePos = movableMines[randomMineIdx];
+            Vector2Int newPos = availableEmpty[randomEmptyIdx];
+
+            candidate.board[minePos.x][minePos.y] = 'E';
+            candidate.board[newPos.x][newPos.y] = 'M';
         }
-    }*/
-
-
-    /*
-     * Retorna un índice diferente al actual.
-     *
-     * current = 94
-     * datasetSize = 1032
-     *
-     * resultado posible = 700
-     *
-     * Debe estar entre 0 y datasetSize - 1
-     * y no debe ser igual a current.
-     */
-    /*private int RandomDifferentPokemon(
-        int current,
-        int datasetSize,
-        System.Random random)
-    {
-        if (datasetSize <= 1)
-        {
-            return current;
-        }
-
-        int newIndex;
-
-        do
-        {
-            newIndex = random.Next(0, datasetSize);
-        }
-        while (newIndex == current);
-
-        return newIndex;
     }
 
     private void EvaluatePopulation(
-        List<PokemonTeamCandidate> population,
-        IReadOnlyList<PokemonData> dataset,
-        PokemonTeamGenerationConfig config)
+        List<BoardCandidate> population,
+        bool[,] maskGrid,
+        bool preferHighDensity)
     {
-        foreach (PokemonTeamCandidate candidate in population)
+        foreach (BoardCandidate candidate in population)
         {
-            PokemonTeamFitness.Evaluate(candidate, dataset, config);
+            HillClimbing.EvaluateBoard(candidate, maskGrid, preferHighDensity);
         }
-    }*/
+    }
 }
