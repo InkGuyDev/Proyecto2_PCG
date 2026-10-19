@@ -22,7 +22,7 @@ public class GeneratorManager : MonoBehaviour
     [SerializeField] private TileBase mineTile;
     [Tooltip("Tile para casilla sin minas alrededor ('0' o 'E')")]
     [SerializeField] private TileBase emptyTile;
-    [Tooltip("Opcional: Tile para distinguir visualmente las zonas de máscara vacías")]
+    [Tooltip("Tile para distinguir visualmente las zonas de máscara vacías")]
     [SerializeField] private TileBase maskTile;
     [Tooltip("Arreglo de 8 Tiles para los números del 1 al 8 (índice 0 = número 1, ..., índice 7 = número 8)")]
     [SerializeField] private TileBase[] numberTiles = new TileBase[8];
@@ -55,6 +55,19 @@ public class GeneratorManager : MonoBehaviour
     [SerializeField] private EvolutionaryStrategy evolutionaryStrategy;
     [SerializeField] private HillClimbing hillClimbing;
 
+    private List<List<char>> initialBoardSnapshot = new List<List<char>>();
+
+    public bool PreferHighDensity
+    {
+        get => preferHighDensity;
+        set
+        {
+            preferHighDensity = value;
+            if (hillClimbing != null)
+                hillClimbing.PreferHighDensity = value;
+        }
+    }
+
     void Start()
     {
         if (grid == null)
@@ -79,9 +92,7 @@ public class GeneratorManager : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Configura las dimensiones según la dificultad seleccionada, ejecuta los algoritmos y pinta el Tilemap.
-    /// </summary>
+    // Configura las dimensiones según la dificultad seleccionada, ejecuta los algoritmos y pinta el Tilemap.
     [ContextMenu("Generar Nuevo Tablero (NewDificult)")]
     public void NewDificult()
     {
@@ -98,32 +109,64 @@ public class GeneratorManager : MonoBehaviour
             return;
         }
 
-        // 1. Generar estado inicial aleatorio y máscaras de protección
-        matriz = randomStartState.GenerateInitialBoard(width, height, mineCount, out currentMaskGrid);
+        // 1. Generar un NUEVO estado inicial aleatorio y máscaras de protección
+        List<List<char>> rawInitial = randomStartState.GenerateInitialBoard(width, height, mineCount, out currentMaskGrid);
 
-        // 2. Ejecutar Evolutionary Strategy (mu + lambda) si está activo
+        // Guardar una copia intacta de esta condición inicial para poder compararla después
+        initialBoardSnapshot = CloneBoard(rawInitial);
+
+        // 2. Ejecutar los algoritmos sobre una copia de la condición inicial
+        RunAlgorithmsOnSnapshot();
+    }
+
+    // Re-ejecuta los algoritmos sobre EXACTAMENTE el mismo tablero inicial y máscaras guardados.
+    // Ideal para comparar dos o más configuraciones distintas sobre la misma instancia.
+    [ContextMenu("Re-evaluar Misma Condición Inicial")]
+    public void RunOnSameInitialState()
+    {
+        if (initialBoardSnapshot == null || initialBoardSnapshot.Count == 0)
+        {
+            NewDificult();
+            return;
+        }
+
+        RunAlgorithmsOnSnapshot();
+    }
+
+    private void RunAlgorithmsOnSnapshot()
+    {
+        // Partimos siempre desde un clon intacto del estado inicial guardado
+        matriz = CloneBoard(initialBoardSnapshot);
+
+        // Ejecutar Evolutionary Strategy (mu + lambda) si está activo
         if (useEvolutionaryStrategy && evolutionaryStrategy != null)
         {
             matriz = evolutionaryStrategy.Generate(matriz, currentMaskGrid, preferHighDensity);
         }
 
-        // 3. Ejecutar Hill Climbing para ajuste local con el mapa de calor si está activo
+        // Ejecutar Hill Climbing para ajuste local con el mapa de calor si está activo
         if (useHillClimbing && hillClimbing != null)
         {
             hillClimbing.PreferHighDensity = preferHighDensity;
             matriz = hillClimbing.Optimize(matriz, currentMaskGrid);
         }
 
-        // 4. Calcular los números de pistas ('0' a '8') en las casillas que no son minas
+        // Calcular los números de pistas (0 a 8) y pintar en el Tilemap
         CalculateMinesweeperNumbers(matriz);
-
-        // 5. Pintar el resultado en el Tilemap
         Interpretation();
     }
 
-    /// <summary>
-    /// Permite cambiar la dificultad por código (por ejemplo, desde botones de la UI).
-    /// </summary>
+    private List<List<char>> CloneBoard(List<List<char>> source)
+    {
+        List<List<char>> copy = new List<List<char>>(source.Count);
+        for (int x = 0; x < source.Count; x++)
+        {
+            copy.Add(new List<char>(source[x]));
+        }
+        return copy;
+    }
+
+    // Permite cambiar la dificultad por código (por ejemplo, desde botones de la UI).
     public void SetDifficultyAndGenerate(int difficultyIndex)
     {
         selectedDifficulty = (DifficultyLevel)Mathf.Clamp(difficultyIndex, 0, 3);
@@ -145,10 +188,8 @@ public class GeneratorManager : MonoBehaviour
                 return DifVariable;
         }
     }
-
-    /// <summary>
-    /// Recorre la matriz y reemplaza las casillas 'E' (vacías) por el número de minas vecinas ('0' a '8').
-    /// </summary>
+    
+    // Recorre la matriz y reemplaza las casillas 'E' (vacías) por el número de minas vecinas ('0' a '8').
     private void CalculateMinesweeperNumbers(List<List<char>> board)
     {
         int width = board.Count;
@@ -185,9 +226,7 @@ public class GeneratorManager : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Interpreta la matriz de caracteres y coloca los Tiles correspondientes en el Tilemap.
-    /// </summary>
+    // Interpreta la matriz de caracteres y coloca los Tiles correspondientes en el Tilemap.
     public void Interpretation()
     {
         if (tilemap == null)

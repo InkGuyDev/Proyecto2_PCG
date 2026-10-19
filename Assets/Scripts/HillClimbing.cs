@@ -18,27 +18,44 @@ public class HillClimbing : MonoBehaviour
     [Header("Debug")]
     [SerializeField] private bool logProgress = true;
 
+    public float LastInitialFitness { get; private set; }
+    public float LastFinalFitness { get; private set; }
+    public int LastIterationsExecuted { get; private set; }
+    public float LastExecutionTimeMs { get; private set; }
+
     public bool PreferHighDensity
     {
         get => preferHighDensity;
         set => preferHighDensity = value;
     }
 
-    /// <summary>
-    /// Ejecuta Hill Climbing sobre un tablero existente respetando las máscaras.
-    /// </summary>
+    public int MaxIterations
+    {
+        get => maxIterations;
+        set => maxIterations = Mathf.Max(1, value);
+    }
+
+    public int NeighborsPerStep
+    {
+        get => neighborsPerStep;
+        set => neighborsPerStep = Mathf.Max(1, value);
+    }
+
+    // Ejecuta Hill Climbing sobre un tablero existente respetando las máscaras
     public List<List<char>> Optimize(List<List<char>> initialBoard, bool[,] maskGrid)
     {
+        System.Diagnostics.Stopwatch stopwatch = System.Diagnostics.Stopwatch.StartNew();
+
         BoardCandidate current = new BoardCandidate(initialBoard);
         EvaluateBoard(current, maskGrid, preferHighDensity);
 
-        float initialFitness = current.fitness;
+        LastInitialFitness = current.fitness;
+        LastIterationsExecuted = 0;
 
         for (int iter = 0; iter < maxIterations; iter++)
         {
             BoardCandidate bestNeighbor = null;
 
-            // Generar vecinos moviendo una mina a una casilla vacía (solo en zonas sin máscara)
             for (int n = 0; n < neighborsPerStep; n++)
             {
                 BoardCandidate neighbor = GenerateNeighbor(current, maskGrid);
@@ -50,33 +67,35 @@ public class HillClimbing : MonoBehaviour
                 }
             }
 
-            // Si el mejor vecino supera al estado actual, avanzamos ("subimos la colina")
             if (bestNeighbor != null && bestNeighbor.fitness > current.fitness)
             {
                 current = bestNeighbor;
+                LastIterationsExecuted = iter + 1;
             }
             else
             {
-                // Si no hubo mejora tras explorar vecinos, llegamos a un óptimo local
+                LastIterationsExecuted = iter + 1;
                 if (logProgress)
                 {
-                    Debug.Log($"[HillClimbing] Óptimo local alcanzado en iteración {iter}. Fitness Inicial: {initialFitness:F2} -> Final: {current.fitness:F2}");
+                    Debug.Log($"[HillClimbing] Óptimo local alcanzado en iteración {LastIterationsExecuted}. Fitness Inicial: {LastInitialFitness:F2} -> Final: {current.fitness:F2}");
                 }
                 break;
             }
         }
 
+        stopwatch.Stop();
+        LastFinalFitness = current.fitness;
+        LastExecutionTimeMs = (float)stopwatch.Elapsed.TotalMilliseconds;
+
         if (logProgress)
         {
-            Debug.Log($"[HillClimbing] Finalizado. Fitness Inicial: {initialFitness:F2} -> Final: {current.fitness:F2}");
+            Debug.Log($"[HillClimbing] Finalizado en {LastExecutionTimeMs:F2} ms ({LastIterationsExecuted} iteraciones). Fitness Inicial: {LastInitialFitness:F2} -> Final: {LastFinalFitness:F2}");
         }
 
         return current.board;
     }
 
-    /// <summary>
-    /// Genera un tablero vecino moviendo una mina no bloqueada a una casilla vacía no bloqueada.
-    /// </summary>
+    // Genera un tablero vecino moviendo una mina no bloqueada a una casilla vacía no bloqueada.
     private BoardCandidate GenerateNeighbor(BoardCandidate current, bool[,] maskGrid)
     {
         BoardCandidate neighbor = current.Clone();
@@ -111,10 +130,8 @@ public class HillClimbing : MonoBehaviour
         return neighbor;
     }
 
-    /// <summary>
-    /// Evalúa el tablero asignando un valor a cada casilla según el mapa de calor de densidad.
-    /// Este método es público/estático para que EvolutionaryStrategy también pueda usarlo.
-    /// </summary>
+    // Evalúa el tablero asignando un valor a cada casilla según el mapa de calor de densidad.
+    // Este método es público/estático para que EvolutionaryStrategy también pueda usarlo.
     public static float EvaluateBoard(BoardCandidate candidate, bool[,] maskGrid, bool highDensity)
     {
         float totalScore = 0f;
