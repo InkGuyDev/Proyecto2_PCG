@@ -13,6 +13,13 @@ public class GeneratorManager : MonoBehaviour
         Variable
     }
 
+    [Header("Ajuste Automático de Cámara")]
+    [SerializeField] private Camera mainCamera;
+    [Tooltip("Margen extra alrededor del tablero (en unidades de mundo) para que no toque los bordes")]
+    [SerializeField] private float cameraPadding = 2.0f;
+    [Tooltip("Desplaza la cámara en X para compensar el espacio que ocupa el panel de la UI (negativo = tablero a la derecha, positivo = tablero a la izquierda)")]
+    [SerializeField] private float uiHorizontalOffset = 0f;
+
     [Header("Malla (para interpretar la matriz)")]
     [SerializeField] private Grid grid;
     [SerializeField] private Tilemap tilemap;
@@ -66,6 +73,30 @@ public class GeneratorManager : MonoBehaviour
             if (hillClimbing != null)
                 hillClimbing.PreferHighDensity = value;
         }
+    }
+
+    public DifficultyLevel SelectedDifficulty
+    {
+        get => selectedDifficulty;
+        set => selectedDifficulty = value;
+    }
+
+    public float MinePercentage
+    {
+        get => minePercentage;
+        set => minePercentage = Mathf.Clamp(value, 0.05f, 0.50f);
+    }
+
+    public bool UseEvolutionaryStrategy
+    {
+        get => useEvolutionaryStrategy;
+        set => useEvolutionaryStrategy = value;
+    }
+
+    public bool UseHillClimbing
+    {
+        get => useHillClimbing;
+        set => useHillClimbing = value;
     }
 
     void Start()
@@ -280,6 +311,40 @@ public class GeneratorManager : MonoBehaviour
             }
         }
 
+        // Ajustar posición y zoom de la cámara automáticamente al terminar de pintar
+        AdjustCamera(width, height);
+
         Debug.Log($"[GeneratorManager] Tablero interpretado en Tilemap ({width}x{height}). Densidad alta: {preferHighDensity}");
+    }
+
+    private void AdjustCamera(int width, int height)
+    {
+        if (mainCamera == null)
+            mainCamera = Camera.main;
+
+        if (mainCamera == null) return;
+
+        // Obtener el tamaño de cada celda del Grid (por defecto 1x1 en Unity)
+        Vector3 cellSize = grid != null ? grid.cellSize : Vector3.one;
+
+        float boardWorldWidth = width * cellSize.x;
+        float boardWorldHeight = height * cellSize.y;
+
+        // 1. Calcular el centro exacto del tablero en coordenadas del mundo
+        Vector3 bottomLeft = tilemap != null ? tilemap.transform.position : transform.position;
+        float centerX = bottomLeft.x + (boardWorldWidth / 2f) + (uiHorizontalOffset * (boardWorldWidth / 10f));
+        float centerY = bottomLeft.y + (boardWorldHeight / 2f);
+
+        mainCamera.transform.position = new Vector3(centerX, centerY, mainCamera.transform.position.z);
+
+        // 2. Ajustar el zoom (Orthographic Size) según el alto y el ancho para pantallas panorámicas
+        if (mainCamera.orthographic)
+        {
+            float verticalSize = (boardWorldHeight / 2f) + cameraPadding;
+            float horizontalSize = ((boardWorldWidth / 2f) + cameraPadding) / mainCamera.aspect;
+
+            // Elegimos el mayor de los dos para asegurar que tanto en 10x10 como en 30x60 quepa todo en pantalla
+            mainCamera.orthographicSize = Mathf.Max(verticalSize, horizontalSize);
+        }
     }
 }

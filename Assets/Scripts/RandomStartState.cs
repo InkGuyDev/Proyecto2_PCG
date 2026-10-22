@@ -12,14 +12,19 @@ public class RandomStartState : MonoBehaviour
     [Range(0.05f, 0.45f)]
     [SerializeField] private float totalMaskCoverage = 0.20f;
 
-    /// <summary>
-    /// Genera el estado inicial del tablero y la matriz de máscaras.
-    /// </summary>
-    /// <param name="width">Ancho del tablero</param>
-    /// <param name="height">Alto del tablero</param>
-    /// <param name="mineCount">Cantidad total de minas a colocar</param>
-    /// <param name="maskGrid">Salida: Matriz donde true indica casilla bloqueada por máscara</param>
-    /// <returns>Matriz de caracteres con 'M' (Mina) y 'E' (Vacío)</returns>
+    public int MaskCount
+    {
+        get => maskCount;
+        set => maskCount = Mathf.Max(1, value);
+    }
+
+    public float TotalMaskCoverage
+    {
+        get => totalMaskCoverage;
+        set => totalMaskCoverage = Mathf.Clamp(value, 0.05f, 0.45f);
+    }
+
+    // Genera el estado inicial del tablero y la matriz de máscaras.
     public List<List<char>> GenerateInitialBoard(int width, int height, int mineCount, out bool[,] maskGrid)
     {
         maskGrid = new bool[width, height];

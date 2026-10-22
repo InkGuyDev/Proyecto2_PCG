@@ -22,13 +22,33 @@ public class EvolutionaryStrategy : MonoBehaviour
     [Header("Debug")]
     [SerializeField] private bool logProgress = true;
 
-    /// <summary>
-    /// Ejecuta la Estrategia Evolutiva (mu + lambda) sobre el tablero inicial respetando la máscara.
-    /// </summary>
-    /// <param name="initialBoard">Tablero generado por RandomStartState</param>
-    /// <param name="maskGrid">Matriz de máscaras (true = casilla protegida)</param>
-    /// <param name="preferHighDensity">True = agrupar minas, False = separar minas</param>
-    /// <returns>El tablero con mejor fitness tras todas las generaciones</returns>
+    public int Mu
+    {
+        get => mu;
+        set => mu = Mathf.Max(1, value);
+    }
+
+    public int Lambda
+    {
+        get => lambda;
+        set => lambda = Mathf.Max(1, value);
+    }
+
+    public int Generations
+    {
+        get => generations;
+        set => generations = Mathf.Max(1, value);
+    }
+
+    public float MutationRate
+    {
+        get => mutationRate;
+        set => mutationRate = Mathf.Clamp01(value);
+    }
+
+    public float LastBestFitness { get; private set; }
+
+    // Ejecuta la Estrategia Evolutiva (mu + lambda) sobre el tablero inicial respetando la máscara.
     public List<List<char>> Generate(
         List<List<char>> initialBoard,
         bool[,] maskGrid,
@@ -79,13 +99,14 @@ public class EvolutionaryStrategy : MonoBehaviour
             }
         }
 
+        LastBestFitness = parents[0].fitness;
+
         // Retornar el tablero del mejor individuo final
         return parents[0].board;
     }
 
-    /// <summary>
-    /// Crea los "mu" padres iniciales manteniendo las máscaras intactas y el mismo número de minas.
-    /// </summary>
+    
+    // Crea los "mu" padres iniciales manteniendo las máscaras intactas y el mismo número de minas.
     private List<BoardCandidate> CreateInitialParents(
         int parentCount,
         List<List<char>> baseBoard,
@@ -109,9 +130,7 @@ public class EvolutionaryStrategy : MonoBehaviour
         return parents;
     }
 
-    /// <summary>
-    /// Muta un tablero moviendo minas ubicadas en zonas NO bloqueadas hacia casillas vacías NO bloqueadas.
-    /// </summary>
+    // Muta un tablero moviendo minas ubicadas en zonas NO bloqueadas hacia casillas vacías NO bloqueadas.
     private void Mutate(
         BoardCandidate candidate,
         bool[,] maskGrid,
