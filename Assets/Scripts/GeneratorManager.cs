@@ -13,28 +13,28 @@ public class GeneratorManager : MonoBehaviour
         Variable
     }
 
-    [Header("Ajuste Autom·tico de C·mara")]
+    [Header("Ajuste Autom√°tico de C√°mara")]
     [SerializeField] private Camera mainCamera;
     [Tooltip("Margen extra alrededor del tablero (en unidades de mundo) para que no toque los bordes")]
     [SerializeField] private float cameraPadding = 2.0f;
-    [Tooltip("Desplaza la c·mara en X para compensar el espacio que ocupa el panel de la UI (negativo = tablero a la derecha, positivo = tablero a la izquierda)")]
+    [Tooltip("Desplaza la c√°mara en X para compensar el espacio que ocupa el panel de la UI (negativo = tablero a la derecha, positivo = tablero a la izquierda)")]
     [SerializeField] private float uiHorizontalOffset = 0f;
 
     [Header("Malla (para interpretar la matriz)")]
     [SerializeField] private Grid grid;
     [SerializeField] private Tilemap tilemap;
 
-    [Header("Tiles para el Tilemap (VisualizaciÛn)")]
+    [Header("Tiles para el Tilemap (Visualizaci√≥n)")]
     [Tooltip("Tile para representar una mina ('M')")]
     [SerializeField] private TileBase mineTile;
     [Tooltip("Tile para casilla sin minas alrededor ('0' o 'E')")]
     [SerializeField] private TileBase emptyTile;
-    [Tooltip("Tile para distinguir visualmente las zonas de m·scara vacÌas")]
+    [Tooltip("Tile para distinguir visualmente las zonas de m√°scara vac√≠as")]
     [SerializeField] private TileBase maskTile;
-    [Tooltip("Arreglo de 8 Tiles para los n˙meros del 1 al 8 (Ìndice 0 = n˙mero 1, ..., Ìndice 7 = n˙mero 8)")]
+    [Tooltip("Arreglo de 8 Tiles para los n√∫meros del 1 al 8 (√≠ndice 0 = n√∫mero 1, ..., √≠ndice 7 = n√∫mero 8)")]
     [SerializeField] private TileBase[] numberTiles = new TileBase[8];
 
-    // Matriz de generaciÛn
+    // Matriz de generaci√≥n
     private List<List<char>> matriz = new List<List<char>>();
     private bool[,] currentMaskGrid;
 
@@ -45,8 +45,8 @@ public class GeneratorManager : MonoBehaviour
     [SerializeField] private Vector2Int DifDificult = new Vector2Int(30, 60);
     [SerializeField] private Vector2Int DifVariable = new Vector2Int(5, 5);
 
-    [Header("ConfiguraciÛn de Minas y Densidad")]
-    [Tooltip("Porcentaje del tablero que tendr· minas (ej. 0.18 = 18% de las casillas)")]
+    [Header("Configuraci√≥n de Minas y Densidad")]
+    [Tooltip("Porcentaje del tablero que tendr√° minas (ej. 0.18 = 18% de las casillas)")]
     [Range(0.05f, 0.50f)]
     [SerializeField] private float minePercentage = 0.18f;
 
@@ -57,7 +57,7 @@ public class GeneratorManager : MonoBehaviour
     [SerializeField] private bool useEvolutionaryStrategy = true;
     [SerializeField] private bool useHillClimbing = true;
 
-    [Header("CÛdigos / Referencias")]
+    [Header("C√≥digos / Referencias")]
     [SerializeField] private RandomStartState randomStartState;
     [SerializeField] private EvolutionaryStrategy evolutionaryStrategy;
     [SerializeField] private HillClimbing hillClimbing;
@@ -116,14 +116,14 @@ public class GeneratorManager : MonoBehaviour
 
     void Update()
     {
-        // Presiona Espacio en modo Play para regenerar el tablero y probar variaciones r·pido
+        // Presiona Espacio en modo Play para regenerar el tablero y probar variaciones r√°pido
         if (Input.GetKeyDown(KeyCode.Space))
         {
             NewDificult();
         }
     }
 
-    // Configura las dimensiones seg˙n la dificultad seleccionada, ejecuta los algoritmos y pinta el Tilemap.
+    // Configura las dimensiones seg√∫n la dificultad seleccionada, ejecuta los algoritmos y pinta el Tilemap.
     [ContextMenu("Generar Nuevo Tablero (NewDificult)")]
     public void NewDificult()
     {
@@ -140,19 +140,19 @@ public class GeneratorManager : MonoBehaviour
             return;
         }
 
-        // 1. Generar un NUEVO estado inicial aleatorio y m·scaras de protecciÛn
+        // 1. Generar un NUEVO estado inicial aleatorio y m√°scaras de protecci√≥n
         List<List<char>> rawInitial = randomStartState.GenerateInitialBoard(width, height, mineCount, out currentMaskGrid);
 
-        // Guardar una copia intacta de esta condiciÛn inicial para poder compararla despuÈs
+        // Guardar una copia intacta de esta condici√≥n inicial para poder compararla despu√©s
         initialBoardSnapshot = CloneBoard(rawInitial);
 
-        // 2. Ejecutar los algoritmos sobre una copia de la condiciÛn inicial
+        // 2. Ejecutar los algoritmos sobre una copia de la condici√≥n inicial
         RunAlgorithmsOnSnapshot();
     }
 
-    // Re-ejecuta los algoritmos sobre EXACTAMENTE el mismo tablero inicial y m·scaras guardados.
-    // Ideal para comparar dos o m·s configuraciones distintas sobre la misma instancia.
-    [ContextMenu("Re-evaluar Misma CondiciÛn Inicial")]
+    // Re-ejecuta los algoritmos sobre EXACTAMENTE el mismo tablero inicial y m√°scaras guardados.
+    // Ideal para comparar dos o m√°s configuraciones distintas sobre la misma instancia.
+    [ContextMenu("Re-evaluar Misma Condici√≥n Inicial")]
     public void RunOnSameInitialState()
     {
         if (initialBoardSnapshot == null || initialBoardSnapshot.Count == 0)
@@ -169,20 +169,20 @@ public class GeneratorManager : MonoBehaviour
         // Partimos siempre desde un clon intacto del estado inicial guardado
         matriz = CloneBoard(initialBoardSnapshot);
 
-        // Ejecutar Evolutionary Strategy (mu + lambda) si est· activo
+        // Ejecutar Evolutionary Strategy (mu + lambda) si est√° activo
         if (useEvolutionaryStrategy && evolutionaryStrategy != null)
         {
             matriz = evolutionaryStrategy.Generate(matriz, currentMaskGrid, preferHighDensity);
         }
 
-        // Ejecutar Hill Climbing para ajuste local con el mapa de calor si est· activo
+        // Ejecutar Hill Climbing para ajuste local con el mapa de calor si est√° activo
         if (useHillClimbing && hillClimbing != null)
         {
             hillClimbing.PreferHighDensity = preferHighDensity;
             matriz = hillClimbing.Optimize(matriz, currentMaskGrid);
         }
 
-        // Calcular los n˙meros de pistas (0 a 8) y pintar en el Tilemap
+        // Calcular los n√∫meros de pistas (0 a 8) y pintar en el Tilemap
         CalculateMinesweeperNumbers(matriz);
         Interpretation();
     }
@@ -197,7 +197,7 @@ public class GeneratorManager : MonoBehaviour
         return copy;
     }
 
-    // Permite cambiar la dificultad por cÛdigo (por ejemplo, desde botones de la UI).
+    // Permite cambiar la dificultad por c√≥digo (por ejemplo, desde botones de la UI).
     public void SetDifficultyAndGenerate(int difficultyIndex)
     {
         selectedDifficulty = (DifficultyLevel)Mathf.Clamp(difficultyIndex, 0, 3);
@@ -220,7 +220,7 @@ public class GeneratorManager : MonoBehaviour
         }
     }
     
-    // Recorre la matriz y reemplaza las casillas 'E' (vacÌas) por el n˙mero de minas vecinas ('0' a '8').
+    // Recorre la matriz y reemplaza las casillas 'E' (vac√≠as) por el n√∫mero de minas vecinas ('0' a '8').
     private void CalculateMinesweeperNumbers(List<List<char>> board)
     {
         int width = board.Count;
@@ -251,7 +251,7 @@ public class GeneratorManager : MonoBehaviour
                     }
                 }
 
-                // Convierte el conteo (0-8) en su car·cter correspondiente ('0'-'8')
+                // Convierte el conteo (0-8) en su car√°cter correspondiente ('0'-'8')
                 board[x][y] = (char)('0' + count);
             }
         }
@@ -285,7 +285,7 @@ public class GeneratorManager : MonoBehaviour
                 }
                 else if (cellValue == '0' || cellValue == 'E')
                 {
-                    // Si asignaste un tile especial para visualizar la m·scara, lo usa en casillas vacÌas protegidas
+                    // Un tile especial para visualizar la m√°scara, lo usa en casillas vac√≠as protegidas
                     if (maskTile != null && currentMaskGrid != null && currentMaskGrid[x, y])
                         tileToPlace = maskTile;
                     else
@@ -293,7 +293,7 @@ public class GeneratorManager : MonoBehaviour
                 }
                 else if (cellValue >= '1' && cellValue <= '8')
                 {
-                    int numberIndex = (cellValue - '1'); // '1' -> Ìndice 0, '8' -> Ìndice 7
+                    int numberIndex = (cellValue - '1'); // '1' -> √≠ndice 0, '8' -> √≠ndice 7
                     if (numberTiles != null && numberIndex < numberTiles.Length && numberTiles[numberIndex] != null)
                     {
                         tileToPlace = numberTiles[numberIndex];
@@ -311,7 +311,7 @@ public class GeneratorManager : MonoBehaviour
             }
         }
 
-        // Ajustar posiciÛn y zoom de la c·mara autom·ticamente al terminar de pintar
+        // Ajustar posici√≥n y zoom de la c√°mara autom√°ticamente al terminar de pintar
         AdjustCamera(width, height);
 
         Debug.Log($"[GeneratorManager] Tablero interpretado en Tilemap ({width}x{height}). Densidad alta: {preferHighDensity}");
@@ -324,7 +324,7 @@ public class GeneratorManager : MonoBehaviour
 
         if (mainCamera == null) return;
 
-        // Obtener el tamaÒo de cada celda del Grid (por defecto 1x1 en Unity)
+        // Obtener el tama√±o de cada celda del Grid (por defecto 1x1 en Unity)
         Vector3 cellSize = grid != null ? grid.cellSize : Vector3.one;
 
         float boardWorldWidth = width * cellSize.x;
@@ -337,7 +337,7 @@ public class GeneratorManager : MonoBehaviour
 
         mainCamera.transform.position = new Vector3(centerX, centerY, mainCamera.transform.position.z);
 
-        // 2. Ajustar el zoom (Orthographic Size) seg˙n el alto y el ancho para pantallas panor·micas
+        // 2. Ajustar el zoom (Orthographic Size) seg√∫n el alto y el ancho para pantallas panor√°micas
         if (mainCamera.orthographic)
         {
             float verticalSize = (boardWorldHeight / 2f) + cameraPadding;
